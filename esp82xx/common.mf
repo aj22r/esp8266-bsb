@@ -1,0 +1,78 @@
+###############################################################################
+# This is for commom variables shared between sub-Makefiles
+# The variables here are not necessary for the extensa compiler, but also
+#+for client software like the command-line utilities (e.g. execute_reflash).
+# Note: user.cfg can override these.
+
+###############################################################################
+# Toolchain Options
+###############################################################################
+
+GCC_FOLDER = $(ESP_ROOT)/xtensa-lx106-elf
+ESPTOOL_PY = python2 $(ESP_ROOT)/esptool/esptool.py
+SDK       ?= $(PWD)/esp82xx/toolchain/esp_nonos_sdk
+
+XTLIB        = $(SDK)/lib
+XTGCCLIB     = $(GCC_FOLDER)/lib/gcc/xtensa-lx106-elf/$(ESP_GCC_VERS)/libgcc.a
+FOLDERPREFIX = $(GCC_FOLDER)/bin
+PREFIX       = $(FOLDERPREFIX)/xtensa-lx106-elf-
+CC           = $(PREFIX)gcc
+OBJCOPY      = $(PREFIX)objcopy
+LD           = $(PREFIX)ld
+AR           = $(PREFIX)ar
+CP           = cp
+
+
+INIT_DATA_ROM?=$(SDK)/bin/esp_init_data_default_v08.bin
+
+ifneq ("$(wildcard $($(INIT_DATA_ROM)))","")
+	INIT_DATA_ROM?=$(INIT_DATA_ROM)
+else
+	INIT_DATA_ROM?=$(SDK)/bin/esp_init_data_default.bin
+endif
+
+ifneq ("$(wildcard $($(SDK)/ld/linkerscript.ld))","")
+	LINKERSCRIPT?=$(SDK)/ld/linkerscript.ld
+else
+	LINKERSCRIPT?=$(SDK)/ld/eagle.app.v6.ld
+endif
+
+SLOWTICK_MS ?= 50
+
+###############################################################################
+# Derived Options
+###############################################################################
+
+OPTS += -DWEB_PORT=$(WEB_PORT) -DCOM_PORT=$(COM_PORT) -DBACKEND_PORT=$(BACKEND_PORT) $(EXTRAOPTS) -DSLOWTICK_MS=$(SLOWTICK_MS)
+PAGE_SCRIPTS?=$(wildcard web/page/*.js)
+
+# Getting xtensa compiler paths from shell variables
+ESP_DEFAULT = $(HOME)/esp8266/esp-open-sdk
+ESP_ROOT := $(shell echo "$$ESP_ROOT")
+ifeq ($(strip $(ESP_ROOT)),)
+    $(warning Warning: No shell variable 'ESP_ROOT', using '$(ESP_DEFAULT)')
+    ESP_ROOT := $(ESP_DEFAULT)
+endif
+
+
+ifeq ($(strip $(STRIPPED_LIBGCC)),YES)
+	XTGCCLIB=esp82xx/libgcc_stripped.a
+endif
+
+# Version related stuff
+VCMD = git describe --abbrev=5 --dirty=-dev --always --tags 2>/dev/null                                          
+VERSION := $(shell $(VCMD) || { cd esp82xx 2>/dev/null; $(VCMD) ; } ||  echo "unknown")
+VERSSTR := "Version: $(VERSION) - Build $(shell LANG=en_us_8859_1 date '+%a, %b %e %Y, %R:%S %z') with $(OPTS)"
+PROJECT_NAME := $(notdir $(shell git rev-parse --show-toplevel 2>/dev/null || echo "exp82xx-project"))
+PROJECT_URL := $(subst .com:,.com/,$(subst .git,,$(subst git@,https://,$(shell git config --get remote.origin.url 2>/dev/null || echo "https://github.com/con-f-use/esp82xx-basic.git"))))
+
+# Newline and space hacks
+define \n
+
+
+endef
+empty:=
+\s:= $(empty) $(empty)
+
+# Helper functions
+uniq = $(if $1,$(firstword $1) $(call uniq,$(filter-out $(firstword $1),$1)))
